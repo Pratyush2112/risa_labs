@@ -6,8 +6,9 @@ import TaskModal from '../components/TaskModal.jsx';
 import { getDaily } from '../lib/data.js';
 import { inr, inrShort, num, pct, shortDate } from '../lib/format.js';
 
-const C = { ink: '#13203B', line: '#E1E5EC', faint: '#8A94A6', gold: '#E39B0B', grey: '#CDD3DD', teal: '#0E7466', brick: '#B3261E', amber: '#A86400' };
-const TONE_COLOR = { Scale: C.teal, Continue: C.faint, Change: C.amber, Stop: C.brick };
+import { COLOR as C, reducedMotion } from '../lib/tokens.js';
+
+const TONE_COLOR = { Scale: C.teal, Continue: C.continue, Change: C.amber, Stop: C.brick };
 
 function ChartTip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -108,13 +109,13 @@ export default function Overview({ d, tasks, owners, asOf, ask, refresh, goto, v
             <ResponsiveContainer width="100%" height={268}>
               <ComposedChart data={series} margin={{ top: 10, right: 6, left: -14, bottom: 0 }}>
                 <CartesianGrid stroke={C.line} vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: C.faint }} tickLine={false} axisLine={{ stroke: C.line }} interval={Math.max(0, Math.floor(series.length / 7))} />
-                <YAxis yAxisId="l" tick={{ fontSize: 11, fill: C.faint }} tickLine={false} axisLine={false} />
-                <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 11, fill: C.faint }} tickLine={false} axisLine={false} />
-                <Tooltip content={<ChartTip />} cursor={{ fill: 'rgba(19,32,59,0.04)' }} />
-                <Bar yAxisId="l" dataKey="registrations" name="New registrations" fill={C.grey} radius={[2, 2, 0, 0]} />
-                <Line yAxisId="r" dataKey="cum" name="Cumulative registrations" stroke={C.ink} dot={false} strokeWidth={2} />
-                <Line yAxisId="r" dataKey="visitors" name="Cumulative visitors" stroke={C.gold} dot={false} strokeWidth={2} connectNulls />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: C.muted }} tickLine={false} axisLine={{ stroke: C.line }} interval={Math.max(0, Math.floor(series.length / 7))} />
+                <YAxis yAxisId="l" tick={{ fontSize: 11, fill: C.muted }} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 11, fill: C.muted }} tickLine={false} axisLine={false} />
+                <Tooltip content={<ChartTip />} cursor={{ fill: 'rgba(23,32,51,0.04)' }} />
+                <Bar yAxisId="l" dataKey="registrations" name="New registrations" fill={C.grey} radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
+                <Line yAxisId="r" dataKey="cum" name="Cumulative registrations" stroke={C.ink} dot={false} strokeWidth={2} isAnimationActive={!reducedMotion} />
+                <Line yAxisId="r" dataKey="visitors" name="Cumulative visitors" stroke={C.gold} dot={false} strokeWidth={2} connectNulls isAnimationActive={!reducedMotion} />
                 {tg && <ReferenceLine yAxisId="r" y={tg.registration_goal} stroke={C.ink} strokeDasharray="4 4" strokeOpacity={0.5} />}
               </ComposedChart>
             </ResponsiveContainer>
@@ -150,7 +151,7 @@ export default function Overview({ d, tasks, owners, asOf, ask, refresh, goto, v
               <div key={c.campaign_id} className="effrow">
                 <div className="eff-name">{c.campaign_name}</div>
                 <div className="eff-track">
-                  <span className="eff-bar" style={{ width: `${(c.cost / maxCost) * 100}%`, background: TONE_COLOR[c.decision] || C.faint }} />
+                  <span className="eff-bar" style={{ width: `${(c.cost / maxCost) * 100}%`, background: TONE_COLOR[c.decision] || C.continue }} />
                   {d.blendedOutcomeCost != null && <span className="eff-blend" style={{ left: `${(d.blendedOutcomeCost / maxCost) * 100}%` }} title={`Blended ${inr(d.blendedOutcomeCost)}`} />}
                 </div>
                 <div className="eff-val">{inrShort(c.cost)}</div>

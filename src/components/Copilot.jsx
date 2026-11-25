@@ -145,7 +145,7 @@ export default function Copilot({ asOf, d, owners, onClose, onDataChanged, pendi
         {messages.length === 0 && (
           <div className="an-empty">
             <p>Answers come from the same database as the dashboard. Every figure is checked against the data, and nothing is changed until you confirm.</p>
-            <h3 className="an-empty-h">Try asking</h3>
+            <p className="an-empty-h">Try asking</p>
             <ul className="prompts">
               {SUGGESTIONS.map(([, s]) => <li key={s}><button onClick={() => send(s)}>{s}</button></li>)}
             </ul>

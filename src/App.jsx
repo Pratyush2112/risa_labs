@@ -1,16 +1,19 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { configured, getSnapshot, getTasks, getOwners } from './lib/data.js';
 import { deriveSnapshot } from '../shared/metrics.js';
 import Icon from './components/Icon.jsx';
 import Timeline from './components/Timeline.jsx';
 import Copilot from './components/Copilot.jsx';
 import { Notice, Skeleton } from './components/ui.jsx';
-import Overview from './pages/Overview.jsx';
-import Campaigns from './pages/Campaigns.jsx';
-import Tasks from './pages/Tasks.jsx';
-import Bets from './pages/Bets.jsx';
-import DataLab from './pages/DataLab.jsx';
-import Method from './pages/Method.jsx';
+
+// Pages load on demand, so the charting library is only fetched by the pages that draw charts.
+const Overview = lazy(() => import('./pages/Overview.jsx'));
+const Campaigns = lazy(() => import('./pages/Campaigns.jsx'));
+const Tasks = lazy(() => import('./pages/Tasks.jsx'));
+const Bets = lazy(() => import('./pages/Bets.jsx'));
+const DataLab = lazy(() => import('./pages/DataLab.jsx'));
+const Method = lazy(() => import('./pages/Method.jsx'));
+const PageLoading = () => <div className="stack" aria-busy="true"><Skeleton h={150} /><Skeleton h={300} /></div>;
 
 const PAGES = [
   { id: 'overview', label: 'Overview', icon: 'overview', blurb: 'Where attendance stands against target, and what needs attention.' },
@@ -53,6 +56,14 @@ export default function App() {
     const onKey = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('.scrim')) setCopilotOpen(false); }; // a modal handles its own Esc
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [copilotOpen]);
+
+  // When the analyst closes, put keyboard focus back on the button that opens it.
+  const askBtn = useRef(null);
+  const wasOpen = useRef(copilotOpen);
+  useEffect(() => {
+    if (wasOpen.current && !copilotOpen) askBtn.current?.focus({ preventScroll: true });
+    wasOpen.current = copilotOpen;
   }, [copilotOpen]);
 
   const d = useMemo(() => (snap ? deriveSnapshot(snap, { tasks }) : null), [snap, tasks]);
@@ -102,7 +113,7 @@ export default function App() {
           <div className="pagehead-r">
             {loading && <span className="sync" role="status">Updating</span>}
             {!copilotOpen && (
-              <button className="btn accent" onClick={() => setCopilotOpen(true)} aria-expanded={false} aria-controls="analyst">
+              <button ref={askBtn} className="btn accent" onClick={() => setCopilotOpen(true)} aria-expanded={false} aria-controls="analyst">
                 <Icon name="chat" />Ask the analyst
               </button>
             )}
@@ -114,14 +125,14 @@ export default function App() {
           {error && <Notice>Could not load data: {error}</Notice>}
           {!d && !error && <div className="stack"><Skeleton h={150} /><Skeleton h={300} /></div>}
           {d && (
-            <>
+            <Suspense fallback={<PageLoading />}>
               {page === 'overview' && <Overview {...props} />}
               {page === 'campaigns' && <Campaigns {...props} />}
               {page === 'tasks' && <Tasks {...props} />}
               {page === 'bets' && <Bets {...props} />}
               {page === 'data' && <DataLab {...props} />}
               {page === 'method' && <Method {...props} />}
-            </>
+            </Suspense>
           )}
         </main>
       </div>

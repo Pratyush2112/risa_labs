@@ -4,6 +4,7 @@ import { Panel, Decision, Field, Notice, Modal, Pill } from '../components/ui.js
 import Icon from '../components/Icon.jsx';
 import TaskModal from '../components/TaskModal.jsx';
 import { getDaily, updateCampaign, shiftBudget, createCampaign } from '../lib/data.js';
+import { COLOR as C, reducedMotion } from '../lib/tokens.js';
 import { inr, inrShort, num, pct, shortDate, STATUS_LABEL } from '../lib/format.js';
 
 const COLS = [
@@ -113,13 +114,13 @@ function Inspector({ c, d, tasks, owners, asOf, ask, refresh, version, onClose }
           {series.length > 0 && (
             <ResponsiveContainer width="100%" height={170}>
               <ComposedChart data={series} margin={{ top: 6, right: 0, left: -18, bottom: 0 }}>
-                <CartesianGrid stroke="#E1E5EC" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#8A94A6' }} tickLine={false} interval={Math.max(0, Math.floor(series.length / 5))} />
-                <YAxis yAxisId="l" tick={{ fontSize: 10, fill: '#8A94A6' }} tickLine={false} axisLine={false} />
-                <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 10, fill: '#8A94A6' }} tickLine={false} axisLine={false} />
+                <CartesianGrid stroke={C.line} vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: C.muted }} tickLine={false} interval={Math.max(0, Math.floor(series.length / 5))} />
+                <YAxis yAxisId="l" tick={{ fontSize: 10, fill: C.muted }} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 10, fill: C.muted }} tickLine={false} axisLine={false} />
                 <Tooltip formatter={(v, n) => (n === 'Spend' ? inr(v) : num(v))} />
-                <Bar yAxisId="l" dataKey="spend" name="Spend" fill="#CDD3DD" radius={[2, 2, 0, 0]} />
-                <Line yAxisId="r" dataKey="registrations" name="Registrations" stroke="#13203B" dot={false} strokeWidth={1.75} />
+                <Bar yAxisId="l" dataKey="spend" name="Spend" fill={C.grey} radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
+                <Line yAxisId="r" dataKey="registrations" name="Registrations" stroke={C.ink} dot={false} strokeWidth={1.75} isAnimationActive={!reducedMotion} />
               </ComposedChart>
             </ResponsiveContainer>
           )}

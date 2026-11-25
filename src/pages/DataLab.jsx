@@ -47,7 +47,7 @@ function Quality({ refresh, version }) {
   return (
     <div className="split even">
       <Panel title="Ingest report" aside={rows[0] && <span className="muted small">Last run {dateTime(rows[0].at)}</span>} pad={false}>
-        <table className="grid-table">
+        <div className="table-scroll"><table className="grid-table">
           <thead><tr><th>Table</th><th className="num">Raw rows</th><th className="num">Distinct IDs</th><th className="num">Loaded</th><th className="num">Duplicates removed</th><th className="num">Orphans skipped</th></tr></thead>
           <tbody>
             {rows.map((r) => (
@@ -59,7 +59,7 @@ function Quality({ refresh, version }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         <p className="foot-note">Import retries repeated some records with the same source ID; each ID counts once. Orphans are rows whose person, registration or campaign does not exist; foreign keys keep them out.</p>
       </Panel>
       <Panel title="Restore original data">
@@ -255,7 +255,7 @@ function TargetsEditor({ refresh, version }) {
       <Notice tone="good">{msg}</Notice>
       <div className="split even">
         <Panel title="Targets" aside={<Kind kind="source" />} pad={false}>
-          <table className="grid-table">
+          <div className="table-scroll"><table className="grid-table">
             <thead><tr><th>Version</th><th className="num">Identified</th><th className="num">Registrations</th><th className="num">Visitors</th><th className="num">Budget ₹</th></tr></thead>
             <tbody>
               {targets.map((t) => (
@@ -268,11 +268,11 @@ function TargetsEditor({ refresh, version }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <p className="foot-note">Each version applies from its effective time. Edit a value and leave the field to save.</p>
         </Panel>
         <Panel title="Assumptions and decision thresholds" pad={false}>
-          <table className="grid-table">
+          <div className="table-scroll"><table className="grid-table">
             <tbody>
               {settings.map((s) => (
                 <tr key={s.key}>
@@ -282,7 +282,7 @@ function TargetsEditor({ refresh, version }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </Panel>
       </div>
     </div>
