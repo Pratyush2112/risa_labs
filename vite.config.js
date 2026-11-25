@@ -1,5 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import path from 'node:path';
 
 // In development, serve the Vercel functions in /api from the Vite server itself, so `npm run dev`
 // runs the whole app (UI + analyst). In production Vercel serves /api; this plugin is dev-only.
@@ -45,5 +47,8 @@ export default defineConfig(({ mode }) => {
   // Make every .env value (not only VITE_*) visible to the API handlers, like Vercel does.
   const env = loadEnv(mode, process.cwd(), '');
   for (const [k, v] of Object.entries(env)) if (process.env[k] === undefined) process.env[k] = v;
-  return { plugins: [react(), vercelApiInDev()] };
+  return {
+    plugins: [react(), tailwindcss(), vercelApiInDev()],
+    resolve: { alias: { '@': path.resolve(process.cwd(), 'src') } },
+  };
 });

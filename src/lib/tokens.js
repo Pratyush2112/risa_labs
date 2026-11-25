@@ -1,15 +1,14 @@
-// Colour tokens for places CSS variables cannot reach (Recharts SVG props, inline swatches).
-// Keep in step with :root in styles.css.
+// Theme colours for Recharts props. They are CSS variables, so charts follow light/dark mode.
 export const COLOR = {
-  ink: '#172033',
-  muted: '#5B6578', // axis text: passes AA on white
-  line: '#E3E6EB',
-  grey: '#CDD2DA', // neutral bars and "interested"
-  gold: '#E5A00D',
-  teal: '#0E7466',
-  amber: '#955800',
-  brick: '#B3261E',
-  continue: '#8F98A8', // a bar fill, not text
+  ink: 'var(--chart-1)',
+  gold: 'var(--chart-2)',
+  teal: 'var(--success)',
+  amber: 'var(--warning)',
+  brick: 'var(--danger)',
+  grey: 'var(--chart-5)',
+  continue: 'var(--muted-foreground)',
+  muted: 'var(--muted-foreground)',
+  line: 'var(--border)',
 };
 
 // Charts skip their draw-in animation when the person asked for reduced motion.

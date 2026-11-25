@@ -1,5 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { addDays, daysBetween, longDate } from '../lib/format.js';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Pill } from './ui.jsx';
 
 const START = '2025-01-15';
 const END = '2025-04-20';
@@ -8,6 +13,7 @@ const EVENT_A = '2025-04-12';
 const EVENT_B = '2025-04-13';
 const SPAN = daysBetween(START, END);
 const at = (iso) => `${(daysBetween(START, iso) / SPAN) * 100}%`;
+const PRESETS = [['2025-02-15', 'Mid-Feb'], [REVISION, 'Revision'], ['2025-04-11', 'Event eve'], [END, 'Final']];
 
 function phase(d) {
   if (d < REVISION) return ['Launch plan', 'mute'];
@@ -27,53 +33,49 @@ export default function Timeline({ asOf, onChange }) {
 
   const idx = daysBetween(START, draft);
   const [label, tone] = phase(draft);
-  const months = useMemo(() => ['2025-02-01', '2025-03-01', '2025-04-01'], []);
-  const jump = (iso) => setDraft(iso);
-  const step = (n) => setDraft((d) => {
-    const next = addDays(d, n);
-    return next < START ? START : next > END ? END : next;
-  });
+  const months = useMemo(() => [['2025-02-01', 'Feb'], ['2025-03-01', 'Mar'], ['2025-04-01', 'Apr']], []);
+  const step = (n) => setDraft((d) => { const x = addDays(d, n); return x < START ? START : x > END ? END : x; });
+  const preset = PRESETS.find(([d]) => d === draft)?.[0] ?? '';
 
   return (
-    <div className="timeline" role="group" aria-label="Snapshot date">
-      <div className="tl-top">
-        <div className="tl-read">
-          <div className="tl-date">
-            <span className="tl-k">Viewing the end of</span>
-            <strong>{longDate(draft)}</strong>
-          </div>
-          <span className={`pill tone-${tone}`}>{label}</span>
+    <div className="flex flex-col gap-2 px-4 pb-3 md:px-6" role="group" aria-label="Snapshot date">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="text-xs text-muted-foreground">As of</span>
+          <span className="text-sm font-semibold tracking-tight whitespace-nowrap">{longDate(draft)}</span>
+          <Pill tone={tone} dot>{label}</Pill>
         </div>
-
-        <div className="tl-jumps" role="group" aria-label="Jump to a key date">
-          {[['2025-02-15', 'Mid-Feb'], [REVISION, 'Revision'], ['2025-04-11', 'Event eve'], [END, 'Final']].map(([d, l]) => (
-            <button key={d} className={`chip ${draft === d ? 'on' : ''}`} onClick={() => jump(d)} aria-pressed={draft === d}>{l}</button>
-          ))}
-          <input className="tl-input" type="date" min={START} max={END} value={draft}
-            onChange={(e) => e.target.value && setDraft(e.target.value)} aria-label="Pick a date" />
+        <div className="flex flex-wrap items-center gap-2">
+          <ToggleGroup type="single" variant="outline" size="sm" value={preset} onValueChange={(v) => v && setDraft(v)} aria-label="Jump to a key date">
+            {PRESETS.map(([d, l]) => <ToggleGroupItem key={d} value={d} className="px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">{l}</ToggleGroupItem>)}
+          </ToggleGroup>
+          <input type="date" min={START} max={END} value={draft} onChange={(e) => e.target.value && setDraft(e.target.value)} aria-label="Pick a date"
+            className="h-8 rounded-md border border-input bg-transparent px-2 text-xs shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30" />
         </div>
       </div>
 
-      <div className="tl-scrub">
-        <button className="icon-btn sm" onClick={() => step(-7)} aria-label="Back one week">−7</button>
-        <div className="tl-track-wrap">
-          <div className="tl-track" aria-hidden="true">
-            <span className="tl-fill" style={{ width: at(draft) }} />
-            <span className="tl-band" style={{ left: at(EVENT_A), width: `calc(${at(EVENT_B)} - ${at(EVENT_A)} + 4px)` }} />
-            <span className="tl-mark gold" style={{ left: at(REVISION) }} />
+      <div className="flex items-center gap-1">
+        <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" onClick={() => step(-7)} aria-label="Back one week"><ChevronLeft /></Button>
+        <div className="relative h-10 flex-1">
+          {/* flags above the track */}
+          <span className="absolute top-0 -translate-x-1/2 text-[10.5px] font-medium whitespace-nowrap text-brand-foreground" style={{ left: at(REVISION) }}>Targets revised</span>
+          <span className="absolute top-0 -translate-x-1/2 text-[10.5px] font-medium whitespace-nowrap text-success" style={{ left: at(EVENT_A) }}>Event</span>
+          {/* track */}
+          <div className="absolute inset-x-0 top-[19px] h-1 rounded-full bg-muted" aria-hidden="true">
+            <span className="absolute inset-y-0 left-0 rounded-full bg-foreground/80" style={{ width: at(draft) }} />
+            <span className="absolute -top-1 h-3 w-0.5 rounded-full bg-brand" style={{ left: at(REVISION) }} />
+            <span className="absolute -top-1 h-3 rounded-sm bg-success" style={{ left: at(EVENT_A), width: `calc(${at(EVENT_B)} - ${at(EVENT_A)} + 3px)` }} />
           </div>
-          <input type="range" min={0} max={SPAN} step={1} value={idx}
-            onChange={(e) => setDraft(addDays(START, Number(e.target.value)))}
-            aria-label="Snapshot date" aria-valuetext={longDate(draft)} />
-          <div className="tl-labels" aria-hidden="true">
-            <span style={{ left: 0 }}>15 Jan</span>
-            {months.map((m) => <span key={m} className="tl-month" style={{ left: at(m) }}>{m === '2025-02-01' ? 'Feb' : m === '2025-03-01' ? 'Mar' : 'Apr'}</span>)}
-            <span className="tl-flag gold" style={{ left: at(REVISION) }}>Targets revised</span>
-            <span className="tl-flag good" style={{ left: at(EVENT_A) }}>Event</span>
-            <span className="tl-end" style={{ right: 0 }}>20 Apr</span>
+          <input type="range" min={0} max={SPAN} step={1} value={idx} className="scrubber absolute inset-x-0 top-[11px] m-0 h-5 w-full"
+            onChange={(e) => setDraft(addDays(START, Number(e.target.value)))} aria-label="Snapshot date" aria-valuetext={longDate(draft)} />
+          {/* month labels below */}
+          <div className="pointer-events-none absolute inset-x-0 top-[28px] text-[10.5px] text-muted-foreground" aria-hidden="true">
+            <span className="absolute left-0">15 Jan</span>
+            {months.map(([m, l]) => <span key={m} className={cn('absolute hidden -translate-x-1/2 sm:inline')} style={{ left: at(m) }}>{l}</span>)}
+            <span className="absolute right-0">20 Apr</span>
           </div>
         </div>
-        <button className="icon-btn sm" onClick={() => step(7)} aria-label="Forward one week">+7</button>
+        <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" onClick={() => step(7)} aria-label="Forward one week"><ChevronRight /></Button>
       </div>
     </div>
   );

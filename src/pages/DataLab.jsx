@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Panel, Field, Notice, Kind, Empty, Pill } from '../components/ui.jsx';
+import { Panel, Field, Notice, Kind, Empty, Pill, NativeSelect } from '../components/ui.jsx';
 import Icon from '../components/Icon.jsx';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { cn } from '@/lib/utils';
 import {
   findDaily, saveDaily, searchRegistrations, getHistory, addStatusVersion, addCheckin,
   getTargets, updateTarget, getSettings, updateSetting, getActivity, getIngestReport, resetDemo,
@@ -12,22 +18,33 @@ const TABS = [
   ['checkin', 'Check-ins'], ['targets', 'Targets and thresholds'], ['log', 'Activity log'],
 ];
 
+// Shared bits for this page only.
+const Split = ({ children, className }) => <div className={cn('grid grid-cols-1 items-start gap-4 *:min-w-0 @4xl/main:grid-cols-2', className)}>{children}</div>;
+const FootNote = ({ children, flush }) => (
+  <p className={cn('text-xs leading-relaxed text-muted-foreground', flush ? 'border-t px-5 py-3' : 'mt-3')}>{children}</p>
+);
+const Actions = ({ children }) => <div className="flex justify-end gap-2">{children}</div>;
+const Th = ({ className, ...p }) => <TableHead className={cn('h-9 text-xs font-medium text-muted-foreground first:pl-5 last:pr-5', className)} {...p} />;
+const Td = ({ className, ...p }) => <TableCell className={cn('first:pl-5 last:pr-5', className)} {...p} />;
+
 export default function DataLab(props) {
   const [tab, setTab] = useState('quality');
   return (
-    <div className="stack">
-      <p className="lede">Change the records behind the dashboard. Every change goes through a validated database function, is logged, and reaches the dashboard and the analyst immediately. The original files are kept untouched and can be restored.</p>
-      <div className="tabs" role="tablist" aria-label="Data Lab sections">
-        {TABS.map(([id, l]) => <button key={id} role="tab" aria-selected={tab === id} className={`tab ${tab === id ? 'on' : ''}`} onClick={() => setTab(id)}>{l}</button>)}
-      </div>
-      <div role="tabpanel">
-        {tab === 'quality' && <Quality {...props} />}
-        {tab === 'daily' && <DailyEditor {...props} />}
-        {tab === 'status' && <StatusEditor {...props} />}
-        {tab === 'checkin' && <CheckinEditor {...props} />}
-        {tab === 'targets' && <TargetsEditor {...props} />}
-        {tab === 'log' && <Log {...props} />}
-      </div>
+    <div className="flex flex-col gap-5">
+      <p className="max-w-[78ch] text-sm text-muted-foreground">Change the records behind the dashboard. Every change goes through a validated database function, is logged, and reaches the dashboard and the analyst immediately. The original files are kept untouched and can be restored.</p>
+      <Tabs value={tab} onValueChange={setTab} className="gap-4">
+        <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+          <TabsList aria-label="Data Lab sections">
+            {TABS.map(([id, l]) => <TabsTrigger key={id} value={id} className="px-2.5 text-[13px]">{l}</TabsTrigger>)}
+          </TabsList>
+        </div>
+        <TabsContent value="quality"><Quality {...props} /></TabsContent>
+        <TabsContent value="daily"><DailyEditor {...props} /></TabsContent>
+        <TabsContent value="status"><StatusEditor {...props} /></TabsContent>
+        <TabsContent value="checkin"><CheckinEditor {...props} /></TabsContent>
+        <TabsContent value="targets"><TargetsEditor {...props} /></TabsContent>
+        <TabsContent value="log"><Log {...props} /></TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -45,27 +62,32 @@ function Quality({ refresh, version }) {
   }
 
   return (
-    <div className="split even">
-      <Panel title="Ingest report" aside={rows[0] && <span className="muted small">Last run {dateTime(rows[0].at)}</span>} pad={false}>
-        <div className="table-scroll"><table className="grid-table">
-          <thead><tr><th>Table</th><th className="num">Raw rows</th><th className="num">Distinct IDs</th><th className="num">Loaded</th><th className="num">Duplicates removed</th><th className="num">Orphans skipped</th></tr></thead>
-          <tbody>
+    <div className="flex flex-col gap-4">
+      <Panel title="Ingest report" aside={rows[0] && <span>Last run {dateTime(rows[0].at)}</span>} pad={false}>
+        <Table className="tabular-nums">
+          <TableHeader><TableRow className="hover:bg-transparent">
+            <Th>Table</Th><Th className="text-right">Raw rows</Th><Th className="text-right">Distinct IDs</Th><Th className="text-right">Loaded</Th><Th className="text-right">Duplicates removed</Th><Th className="text-right">Orphans skipped</Th>
+          </TableRow></TableHeader>
+          <TableBody>
             {rows.map((r) => (
-              <tr key={r.table_name}>
-                <td>{r.table_name.replaceAll('_', ' ')}</td><td className="num">{num(r.raw_rows)}</td><td className="num">{num(r.distinct_ids)}</td>
-                <td className="num">{num(r.loaded_rows)}</td>
-                <td className="num">{r.duplicates_removed ? <Pill tone="warn">{r.duplicates_removed}</Pill> : 0}</td>
-                <td className="num">{r.orphans_skipped ? <Pill tone="bad">{r.orphans_skipped}</Pill> : 0}</td>
-              </tr>
+              <TableRow key={r.table_name}>
+                <Td className="font-medium capitalize">{r.table_name.replaceAll('_', ' ')}</Td>
+                <Td className="text-right">{num(r.raw_rows)}</Td><Td className="text-right">{num(r.distinct_ids)}</Td>
+                <Td className="text-right">{num(r.loaded_rows)}</Td>
+                <Td className="text-right">{r.duplicates_removed ? <Pill tone="warn">{r.duplicates_removed}</Pill> : <span className="text-muted-foreground">0</span>}</Td>
+                <Td className="text-right">{r.orphans_skipped ? <Pill tone="bad">{r.orphans_skipped}</Pill> : <span className="text-muted-foreground">0</span>}</Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table></div>
-        <p className="foot-note">Import retries repeated some records with the same source ID; each ID counts once. Orphans are rows whose person, registration or campaign does not exist; foreign keys keep them out.</p>
+          </TableBody>
+        </Table>
+        <FootNote flush>Import retries repeated some records with the same source ID; each ID counts once. Orphans are rows whose person, registration or campaign does not exist; foreign keys keep them out.</FootNote>
       </Panel>
-      <Panel title="Restore original data">
-        <p className="small">Rebuilds every core table from the untouched raw files and restores the simulated starting budget split, seed tasks, bets and thresholds. The activity log is kept.</p>
-        <Notice>{err}</Notice>
-        <button className="btn danger" onClick={reset} disabled={busy}><Icon name="reset" size={16} />{busy ? 'Restoring…' : 'Restore original data'}</button>
+      <Panel title="Restore original data" className="border-danger/30">
+        <div className="flex flex-col gap-4 @2xl/main:flex-row @2xl/main:items-center @2xl/main:justify-between">
+          <p className="max-w-[70ch] text-sm text-muted-foreground">Rebuilds every core table from the untouched raw files and restores the simulated starting budget split, seed tasks, bets and thresholds. The activity log is kept.</p>
+          <Button variant="destructive" size="sm" className="self-start @2xl/main:self-center" onClick={reset} disabled={busy}><Icon name="reset" />{busy ? 'Restoring…' : 'Restore original data'}</Button>
+        </div>
+        {err && <div className="mt-4"><Notice>{err}</Notice></div>}
       </Panel>
     </div>
   );
@@ -97,20 +119,19 @@ function DailyEditor({ d, asOf, refresh }) {
       refresh();
     } catch (x) { setErr(x.message); }
   }
-  const f = (k, label, hint) => <Field label={label} hint={hint}><input type="number" step="1" value={rec?.[k] ?? 0} onChange={(e) => setRec({ ...rec, [k]: e.target.value })} /></Field>;
+  const f = (k, label, hint) => <Field label={label} hint={hint}><Input type="number" step="1" className="tabular-nums" value={rec?.[k] ?? 0} onChange={(e) => setRec({ ...rec, [k]: e.target.value })} /></Field>;
 
   return (
-    <Panel title="Daily marketing record">
-      <form className="form" onSubmit={save}>
-        <div className="row">
+    <Panel title="Daily marketing record" description={existing ? `Editing ${existing.activity_id}; current net spend ${inr(existing.marketing_spend_inr)}.` : 'No record for this campaign and date. Saving creates one.'} className="max-w-4xl">
+      <form className="flex flex-col gap-5" onSubmit={save}>
+        <div className="grid gap-4 @lg/main:grid-cols-2">
           <Field label="Campaign">
-            <select value={cid} onChange={(e) => setCid(e.target.value)}>{d.campaigns.map((c) => <option key={c.campaign_id} value={c.campaign_id}>{c.campaign_name}</option>)}</select>
+            <NativeSelect value={cid} onChange={(e) => setCid(e.target.value)}>{d.campaigns.map((c) => <option key={c.campaign_id} value={c.campaign_id}>{c.campaign_name}</option>)}</NativeSelect>
           </Field>
-          <Field label="Date (IST)"><input type="date" min="2025-01-15" max="2025-04-20" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+          <Field label="Date (IST)"><Input type="date" min="2025-01-15" max="2025-04-20" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
         </div>
-        <p className="muted small">{existing ? `Editing ${existing.activity_id}; current net spend ${inr(existing.marketing_spend_inr)}.` : 'No record for this campaign and date. Saving creates one.'}</p>
         {rec && (
-          <div className="fieldgrid">
+          <div className="grid gap-4 border-t pt-5 @lg/main:grid-cols-2 @3xl/main:grid-cols-3">
             {f('marketing_spend_inr', 'Net spend (₹)', 'Negative = vendor credit')}
             {f('impressions', 'Impressions')}{f('clicks', 'Clicks')}{f('reported_reach', 'Reported reach')}
             {f('landing_page_sessions', 'Landing sessions')}{f('registration_starts', 'Registration starts')}
@@ -118,11 +139,13 @@ function DailyEditor({ d, asOf, refresh }) {
         )}
         <Notice>{err}</Notice>
         <Notice tone="good">{msg}</Notice>
-        <div className="actions"><button className="btn primary">Save record</button></div>
+        <Actions><Button type="submit">Save record</Button></Actions>
       </form>
     </Panel>
   );
 }
+
+const STATUS_TONE = (s) => (s === 'confirmed' ? 'good' : s === 'cancelled' ? 'bad' : s === 'waitlisted' ? 'gold' : 'mute');
 
 function StatusEditor({ asOf, refresh }) {
   const [term, setTerm] = useState('');
@@ -152,44 +175,58 @@ function StatusEditor({ asOf, refresh }) {
   }
 
   return (
-    <div className="split even">
+    <Split>
       <Panel title="Find a registration">
-        <form className="row" onSubmit={search}>
-          <Field label="Name or ID" className="grow"><input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Leena, R0001 or E0001" /></Field>
-          <button className="btn primary sm">Search</button>
+        <form className="flex items-end gap-2" onSubmit={search}>
+          <Field label="Name or ID" className="min-w-0 flex-1"><Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Leena, R0001 or E0001" /></Field>
+          <Button type="submit" variant="secondary">Search</Button>
         </form>
-        <Notice>{err}</Notice>
-        {results && (results.length === 0 ? <Empty>No matches.</Empty> : (
-          <ul className="picklist">
-            {results.map((r) => (
-              <li key={r.registration_id}>
-                <button className={reg?.registration_id === r.registration_id ? 'on' : ''} onClick={() => pick(r)}>
-                  <strong>{r.person_name}</strong><span>{r.registration_id}, {r.person_id}, {r.campaign_name}{r.person_type !== 'external' ? `, ${r.person_type}` : ''}</span>
-                </button>
-              </li>
-            ))}
+        {err && <div className="mt-3"><Notice>{err}</Notice></div>}
+        {results && (results.length === 0 ? <Empty className="mt-4">No matches.</Empty> : (
+          <ul className="mt-4 flex max-h-[380px] flex-col gap-1.5 overflow-auto">
+            {results.map((r) => {
+              const on = reg?.registration_id === r.registration_id;
+              return (
+                <li key={r.registration_id}>
+                  <button type="button" aria-pressed={on} onClick={() => pick(r)} className={cn(
+                    'flex w-full flex-col gap-0.5 rounded-md border px-3 py-2 text-left transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                    on && 'border-foreground/60 bg-accent',
+                  )}>
+                    <span className="text-sm font-medium">{r.person_name}</span>
+                    <span className="text-xs text-muted-foreground">{r.registration_id}, {r.person_id}, {r.campaign_name}{r.person_type !== 'external' ? `, ${r.person_type}` : ''}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         ))}
       </Panel>
       <Panel title={reg ? `${reg.person_name}, ${reg.registration_id}` : 'Status history'}>
         {!reg ? <Empty>Select a registration to see and extend its history.</Empty> : (
-          <>
-            <ol className="history">
-              {hist.map((h) => <li key={h.history_id}><span className="h-date">{dateTime(h.effective_at)}</span><Pill tone={h.status === 'confirmed' ? 'good' : h.status === 'cancelled' ? 'bad' : h.status === 'waitlisted' ? 'gold' : 'mute'}>{h.status}</Pill></li>)}
+          <div className="flex flex-col gap-5">
+            <ol className="flex flex-col">
+              {hist.map((h, i) => (
+                <li key={h.history_id} className="relative flex items-center gap-3 py-1.5 pl-5">
+                  <span className="absolute top-1/2 left-[3px] size-2 -translate-y-1/2 rounded-full border-2 border-background bg-muted-foreground/60 ring-1 ring-border" aria-hidden="true" />
+                  {i < hist.length - 1 && <span className="absolute top-1/2 left-[6.5px] h-full w-px bg-border" aria-hidden="true" />}
+                  <span className="w-28 shrink-0 text-xs text-muted-foreground tabular-nums">{dateTime(h.effective_at)}</span>
+                  <Pill tone={STATUS_TONE(h.status)}>{h.status}</Pill>
+                </li>
+              ))}
             </ol>
-            <form className="form" onSubmit={add}>
-              <div className="row">
-                <Field label="New status"><select value={status} onChange={(e) => setStatus(e.target.value)}>{['interested', 'confirmed', 'cancelled', 'waitlisted'].map((s) => <option key={s}>{s}</option>)}</select></Field>
-                <Field label="Effective date"><input type="date" min="2025-01-15" max="2025-04-20" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-                <Field label="Time (IST)"><input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
+            <form className="flex flex-col gap-4 border-t pt-5" onSubmit={add}>
+              <div className="grid gap-4 @lg/main:grid-cols-3 @4xl/main:grid-cols-1 @6xl/main:grid-cols-3">
+                <Field label="New status"><NativeSelect value={status} onChange={(e) => setStatus(e.target.value)}>{['interested', 'confirmed', 'cancelled', 'waitlisted'].map((s) => <option key={s}>{s}</option>)}</NativeSelect></Field>
+                <Field label="Effective date"><Input type="date" min="2025-01-15" max="2025-04-20" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+                <Field label="Time (IST)"><Input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
               </div>
               <Notice tone="good">{msg}</Notice>
-              <div className="actions"><button className="btn primary sm">Add status version</button></div>
+              <Actions><Button type="submit" size="sm">Add status version</Button></Actions>
             </form>
-          </>
+          </div>
         )}
       </Panel>
-    </div>
+    </Split>
   );
 }
 
@@ -216,29 +253,33 @@ function CheckinEditor({ refresh }) {
   }
 
   return (
-    <Panel title="Add an admission record">
-      <form className="form" onSubmit={save}>
-        <div className="seg" role="radiogroup" aria-label="Who">
-          <button type="button" role="radio" aria-checked={mode === 'existing'} className={mode === 'existing' ? 'on' : ''} onClick={() => setMode('existing')}>Existing person</button>
-          <button type="button" role="radio" aria-checked={mode === 'walkin'} className={mode === 'walkin' ? 'on' : ''} onClick={() => setMode('walkin')}>New walk-in</button>
+    <Panel title="Add an admission record" className="max-w-4xl">
+      <form className="flex flex-col gap-5" onSubmit={save}>
+        <ToggleGroup type="single" variant="outline" size="sm" value={mode} onValueChange={(v) => v && setMode(v)} aria-label="Who">
+          <ToggleGroupItem value="existing" className="px-3">Existing person</ToggleGroupItem>
+          <ToggleGroupItem value="walkin" className="px-3">New walk-in</ToggleGroupItem>
+        </ToggleGroup>
+        <div className="max-w-md">
+          {mode === 'existing'
+            ? <Field label="Person ID" hint="For example E0002. Find IDs under Registration status."><Input value={personId} onChange={(e) => setPersonId(e.target.value)} pattern="[A-Za-z][A-Za-z0-9-]{1,20}" required /></Field>
+            : <Field label="Walk-in name"><Input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required /></Field>}
         </div>
-        {mode === 'existing'
-          ? <Field label="Person ID" hint="For example E0002. Find IDs under Registration status."><input value={personId} onChange={(e) => setPersonId(e.target.value)} pattern="[A-Za-z][A-Za-z0-9-]{1,20}" required /></Field>
-          : <Field label="Walk-in name"><input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required /></Field>}
-        <div className="fieldgrid">
-          <Field label="Date"><input type="date" min="2025-01-15" max="2025-04-20" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-          <Field label="Time (IST)"><input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
-          <Field label="Result"><select value={result} onChange={(e) => setResult(e.target.value)}><option>admitted</option><option>denied</option><option>pending</option></select></Field>
-          <Field label="Verification"><select value={verification} onChange={(e) => setVerification(e.target.value)}><option>verified</option><option>unverified</option></select></Field>
-          <Field label="Source"><select value={source} onChange={(e) => setSource(e.target.value)}><option>scanner</option><option>manual</option></select></Field>
+        <div className="grid gap-4 border-t pt-5 @lg/main:grid-cols-2 @3xl/main:grid-cols-3">
+          <Field label="Date"><Input type="date" min="2025-01-15" max="2025-04-20" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+          <Field label="Time (IST)"><Input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
+          <Field label="Result"><NativeSelect value={result} onChange={(e) => setResult(e.target.value)}><option>admitted</option><option>denied</option><option>pending</option></NativeSelect></Field>
+          <Field label="Verification"><NativeSelect value={verification} onChange={(e) => setVerification(e.target.value)}><option>verified</option><option>unverified</option></NativeSelect></Field>
+          <Field label="Source"><NativeSelect value={source} onChange={(e) => setSource(e.target.value)}><option>scanner</option><option>manual</option></NativeSelect></Field>
         </div>
         <Notice>{err}</Notice>
         <Notice tone="good">{msg}</Notice>
-        <div className="actions"><button className="btn primary">Save admission</button></div>
+        <Actions><Button type="submit">Save admission</Button></Actions>
       </form>
     </Panel>
   );
 }
+
+const cellInput = 'ml-auto h-8 w-28 text-right tabular-nums';
 
 function TargetsEditor({ refresh, version }) {
   const [targets, setTargets] = useState([]);
@@ -250,44 +291,54 @@ function TargetsEditor({ refresh, version }) {
   const run = async (fn, ok) => { setErr(null); setMsg(null); try { await fn(); setMsg(ok); refresh(); } catch (e) { setErr(e.message); } };
 
   return (
-    <div className="stack">
+    <div className="flex flex-col gap-4">
       <Notice>{err}</Notice>
       <Notice tone="good">{msg}</Notice>
-      <div className="split even">
-        <Panel title="Targets" aside={<Kind kind="source" />} pad={false}>
-          <div className="table-scroll"><table className="grid-table">
-            <thead><tr><th>Version</th><th className="num">Identified</th><th className="num">Registrations</th><th className="num">Visitors</th><th className="num">Budget ₹</th></tr></thead>
-            <tbody>
+      <Panel title="Targets" aside={<Kind kind="source" />} pad={false}>
+          <Table>
+            <TableHeader><TableRow className="hover:bg-transparent">
+              <Th>Version</Th><Th className="text-right">Identified</Th><Th className="text-right">Registrations</Th><Th className="text-right">Visitors</Th><Th className="text-right">Budget ₹</Th>
+            </TableRow></TableHeader>
+            <TableBody>
               {targets.map((t) => (
-                <tr key={t.target_id}>
-                  <td>{t.target_version}<div className="muted small">from {dateTime(t.effective_at)}</div></td>
+                <TableRow key={t.target_id} className="hover:bg-transparent">
+                  <Td><div className="font-medium">{t.target_version}</div><div className="text-xs text-muted-foreground">from {dateTime(t.effective_at)}</div></Td>
                   {['identified_goal', 'registration_goal', 'visitors_goal', 'budget_inr'].map((k) => (
-                    <td key={k} className="num"><input className="cell" type="number" min="0" defaultValue={t[k]} aria-label={`${t.target_version} ${k}`}
-                      onBlur={(e) => Number(e.target.value) !== t[k] && run(() => updateTarget({ ...t, [k]: e.target.value }), 'Target saved.')} /></td>
+                    <Td key={k} className="text-right">
+                      <Input className={cellInput} type="number" min="0" defaultValue={t[k]} aria-label={`${t.target_version} ${k}`}
+                        onBlur={(e) => Number(e.target.value) !== t[k] && run(() => updateTarget({ ...t, [k]: e.target.value }), 'Target saved.')} />
+                    </Td>
                   ))}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table></div>
-          <p className="foot-note">Each version applies from its effective time. Edit a value and leave the field to save.</p>
+            </TableBody>
+          </Table>
+          <FootNote flush>Each version applies from its effective time. Edit a value and leave the field to save.</FootNote>
         </Panel>
         <Panel title="Assumptions and decision thresholds" pad={false}>
-          <div className="table-scroll"><table className="grid-table">
-            <tbody>
+          <Table>
+            <TableBody>
               {settings.map((s) => (
-                <tr key={s.key}>
-                  <td><div>{s.label} <Kind kind={s.kind} /></div>{s.note && <div className="muted small">{s.note}</div>}<div className="muted small">Allowed {s.min_value} to {s.max_value}</div></td>
-                  <td className="num"><input className="cell" type="number" step="any" min={s.min_value} max={s.max_value} defaultValue={s.value} aria-label={s.label}
-                    onBlur={(e) => Number(e.target.value) !== Number(s.value) && run(() => updateSetting(s.key, e.target.value), 'Setting saved.')} /></td>
-                </tr>
+                <TableRow key={s.key} className="hover:bg-transparent">
+                  <Td className="py-3 whitespace-normal">
+                    <div className="text-sm font-medium">{s.label} <Kind kind={s.kind} /></div>
+                    {s.note && <div className="mt-0.5 text-xs text-muted-foreground">{s.note}</div>}
+                    <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">Allowed {s.min_value} to {s.max_value}</div>
+                  </Td>
+                  <Td className="py-3 text-right align-top">
+                    <Input className={cellInput} type="number" step="any" min={s.min_value} max={s.max_value} defaultValue={s.value} aria-label={s.label}
+                      onBlur={(e) => Number(e.target.value) !== Number(s.value) && run(() => updateSetting(s.key, e.target.value), 'Setting saved.')} />
+                  </Td>
+                </TableRow>
               ))}
-            </tbody>
-          </table></div>
-        </Panel>
-      </div>
+            </TableBody>
+          </Table>
+      </Panel>
     </div>
   );
 }
+
+const ACTOR_TONE = (a) => (a === 'ai_confirmed' ? 'gold' : a === 'system' ? 'ink' : 'mute');
 
 function Log({ version }) {
   const [log, setLog] = useState(null);
@@ -296,18 +347,20 @@ function Log({ version }) {
   if (err) return <Notice>{err}</Notice>;
   if (!log) return null;
   return (
-    <Panel title="Activity log" aside={<span className="muted small">Latest 80 changes</span>} pad={false}>
-      {log.length === 0 ? <div className="pad"><Empty>No changes yet.</Empty></div> : (
-        <ol className="timelog">
+    <Panel title="Activity log" aside={<span>Latest 80 changes</span>} pad={false}>
+      {log.length === 0 ? <div className="px-5 pb-5"><Empty>No changes yet.</Empty></div> : (
+        <ol className="divide-y border-t">
           {log.map((l) => (
-            <li key={l.log_id}>
-              <span className="tlog-when">{dateTime(l.at)}</span>
-              <span className="tlog-what">
-                <strong>{l.action.replaceAll('_', ' ')}</strong>
-                {l.entity_id && <span className="muted"> {l.entity_type} {l.entity_id}</span>}
-                <Pill tone={l.actor === 'ai_confirmed' ? 'gold' : l.actor === 'system' ? 'ink' : 'mute'}>{l.actor === 'ai_confirmed' ? 'AI, confirmed' : l.actor}</Pill>
-              </span>
-              <code className="tlog-detail">{JSON.stringify(l.details)}</code>
+            <li key={l.log_id} className="grid gap-x-4 gap-y-1 px-5 py-3 @2xl/main:grid-cols-[8.5rem_minmax(0,1fr)]">
+              <span className="pt-px text-xs text-muted-foreground tabular-nums">{dateTime(l.at)}</span>
+              <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                  <span className="font-medium first-letter:uppercase">{l.action.replaceAll('_', ' ')}</span>
+                  {l.entity_id && <span className="text-muted-foreground">{l.entity_type} {l.entity_id}</span>}
+                  <Pill tone={ACTOR_TONE(l.actor)}>{l.actor === 'ai_confirmed' ? 'AI, confirmed' : l.actor}</Pill>
+                </div>
+                <code className="line-clamp-2 font-mono text-[11px] leading-relaxed break-all text-muted-foreground">{JSON.stringify(l.details)}</code>
+              </div>
             </li>
           ))}
         </ol>

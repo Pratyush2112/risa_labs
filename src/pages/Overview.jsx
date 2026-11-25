@@ -1,25 +1,38 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from 'recharts';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, ReferenceLine } from 'recharts';
 import { Panel, Meter, Decision, Kind, Empty } from '../components/ui.jsx';
 import Icon from '../components/Icon.jsx';
 import TaskModal from '../components/TaskModal.jsx';
+import { Button } from '@/components/ui/button';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { cn } from '@/lib/utils';
 import { getDaily } from '../lib/data.js';
 import { inr, inrShort, num, pct, shortDate } from '../lib/format.js';
 
 import { COLOR as C, reducedMotion } from '../lib/tokens.js';
 
 const TONE_COLOR = { Scale: C.teal, Continue: C.continue, Change: C.amber, Stop: C.brick };
+const SEVERITY_DOT = { high: 'bg-danger', medium: 'bg-warning', low: 'bg-muted-foreground/50' };
+const SEVERITY_LABEL = { high: 'High severity', medium: 'Medium severity', low: 'Low severity' };
 
-function ChartTip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="chart-tip">
-      <div className="chart-tip-h">{label}</div>
-      {payload.filter((p) => p.value != null).map((p) => (
-        <div key={p.dataKey}><i style={{ background: p.color }} />{p.name}<b>{num(p.value)}</b></div>
-      ))}
-    </div>
-  );
+const CHART_CONFIG = {
+  registrations: { label: 'New registrations', color: C.grey },
+  cum: { label: 'Cumulative registrations', color: C.ink },
+  visitors: { label: 'Cumulative visitors', color: C.gold },
+};
+const TICK = { fontSize: 11, fill: 'var(--muted-foreground)' };
+
+// Divider rules for cells laid out in 1 column, then 2, then 4 (funnel) or 3 (readouts).
+const CELL_DIVIDERS_4 = 'border-t first:border-t-0 @xl/main:[&:nth-child(2)]:border-t-0 @xl/main:even:border-l @4xl/main:border-t-0 @4xl/main:border-l @4xl/main:first:border-l-0';
+// Readouts: 1 column; then spend + cost side by side with the status mix full width; then 3 across.
+const READOUT_CELLS = [
+  '',
+  'border-t @xl/main:border-t-0 @xl/main:border-l',
+  'border-t @xl/main:col-span-2 @4xl/main:col-span-1 @4xl/main:border-t-0 @4xl/main:border-l',
+];
+
+function Swatch({ color, className }) {
+  return <span className={cn('inline-block size-2 shrink-0 rounded-[2px]', className)} style={{ background: color }} aria-hidden="true" />;
 }
 
 function FunnelRibbon({ d }) {
@@ -33,28 +46,45 @@ function FunnelRibbon({ d }) {
       : { key: 'visitors', label: 'Verified visitors', value: t.visitors, goal: tg?.visitors_goal, att: d.attainment?.visitors, conv: d.funnel[3].rate, convLabel: 'of confirmed attended' },
   ];
   return (
-    <div className="ribbon" role="list" aria-label="Attendance funnel">
-      {stages.map((s, i) => (
-        <div key={s.key} className={`ribbon-cell ${s.key === 'visitors' ? 'is-goal' : ''} ${s.projected ? 'is-projected' : ''}`} role="listitem">
-          {i > 0 && s.conv != null && (
-            <div className="ribbon-conv" title={`${pct(s.conv)} ${s.convLabel}`}>
-              <span>{pct(s.conv)}</span><Icon name="chevron" size={14} />
-            </div>
-          )}
-          <div className="ribbon-label">{s.label}{s.projected && <Kind kind="assumption" />}</div>
-          <div className="ribbon-value">{num(s.value)}</div>
-          {s.goal != null ? (
-            <>
-              <Meter value={s.att} goal={d.preEvent && s.key !== 'visitors' ? frac : null} tone={s.key === 'visitors' ? 'gold' : 'ink'} label={`${s.label} versus goal`} />
-              <div className="ribbon-goal">
-                <span>{pct(s.att, 0)} of {num(s.goal)}</span>
-                {d.preEvent && s.key !== 'visitors' && <span className="muted">pace {num(s.key === 'identified' ? d.pace.identified_expected : d.pace.registered_expected)}</span>}
+    <div className="grid overflow-hidden rounded-xl border bg-card text-card-foreground @xl/main:grid-cols-2 @4xl/main:grid-cols-4" role="list" aria-label="Attendance funnel">
+      {stages.map((s, i) => {
+        const isGoal = s.key === 'visitors';
+        const showConv = i > 0 && s.conv != null;
+        return (
+          <div key={s.key} role="listitem"
+            className={cn('relative flex min-w-0 flex-col gap-2 px-5 py-4', CELL_DIVIDERS_4, isGoal && 'bg-brand-soft')}>
+            {showConv && (
+              <div className="absolute top-3.5 left-0 z-10 hidden -translate-x-1/2 items-center gap-0.5 rounded-full border bg-card py-0.5 pr-1 pl-2 text-[11px] font-medium text-foreground shadow-xs @4xl/main:flex"
+                title={`${pct(s.conv)} ${s.convLabel}`}>
+                <span>{pct(s.conv)}</span><span className="sr-only"> {s.convLabel}</span><Icon name="chevron" size={12} className="text-muted-foreground" />
               </div>
-            </>
-          ) : <div className="ribbon-goal muted">No goal set for this stage</div>}
-          {s.projected && <div className="ribbon-note">{num(t.confirmed)} confirmed × {pct(d.settings.confirmed_show_rate, 0)} + {d.settings.expected_walkins} walk-ins</div>}
-        </div>
-      ))}
+            )}
+            <div className={cn('flex min-h-5 items-center justify-between gap-2', showConv && '@4xl/main:pl-6')}>
+              <span className="flex min-w-0 items-center text-xs font-medium text-muted-foreground">
+                <span className="truncate">{s.label}</span>{s.projected && <Kind kind="assumption" />}
+              </span>
+              {showConv && (
+                <span className="shrink-0 text-[11px] text-muted-foreground @4xl/main:hidden" title={`${pct(s.conv)} ${s.convLabel}`}>
+                  <span className="font-medium text-foreground">{pct(s.conv)}</span> {s.convLabel}
+                </span>
+              )}
+            </div>
+            <div className={cn('text-3xl leading-none font-semibold tracking-tight', s.projected && 'text-brand-foreground')}>{num(s.value)}</div>
+            <div className="mt-auto flex flex-col gap-2 pt-1">
+              {s.goal != null ? (
+                <>
+                  <Meter value={s.att} goal={d.preEvent && !isGoal ? frac : null} tone={isGoal ? 'gold' : 'ink'} label={`${s.label} versus goal`} className={isGoal ? 'bg-brand/20' : undefined} />
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-xs">
+                    <span className="text-foreground">{pct(s.att, 0)} <span className="text-muted-foreground">of {num(s.goal)}</span></span>
+                    {d.preEvent && !isGoal && <span className="text-muted-foreground">pace {num(s.key === 'identified' ? d.pace.identified_expected : d.pace.registered_expected)}</span>}
+                  </div>
+                </>
+              ) : <div className="text-xs text-muted-foreground">No goal set for this stage</div>}
+              {s.projected && <div className="text-xs text-muted-foreground">{num(t.confirmed)} confirmed × {pct(d.settings.confirmed_show_rate, 0)} + {d.settings.expected_walkins} walk-ins</div>}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -72,69 +102,95 @@ export default function Overview({ d, tasks, owners, asOf, ask, refresh, goto, v
   const efficiency = d.campaigns.filter((c) => c.outcome_cost != null).map((c) => ({ ...c, cost: Math.round(c.outcome_cost) })).sort((a, b) => a.cost - b.cost);
   const maxCost = Math.max(1, ...efficiency.map((e) => e.cost));
   const statusTotal = Math.max(1, t.interested + t.confirmed + t.cancelled + t.waitlisted);
+  const statusParts = [
+    ['confirmed', 'Confirmed', C.ink], ['interested', 'Interested', C.grey],
+    ['cancelled', 'Cancelled', C.brick], ['waitlisted', 'Waitlisted', 'var(--chart-3)'],
+  ];
 
   return (
-    <div className="stack">
+    <div className="flex flex-col gap-4">
       <FunnelRibbon d={d} />
 
-      <div className="readouts">
-        <div className="readout">
-          <div className="readout-l">Net spend</div>
-          <div className="readout-v">{inr(t.spend)}</div>
-          {tg && <><Meter value={d.attainment.budget_used} goal={d.preEvent ? d.pace.elapsed_fraction : null} label="Spend versus approved budget" />
-            <div className="readout-s">{pct(d.attainment.budget_used, 0)} of {inr(tg.budget_inr)} approved{d.preEvent ? `, ${pct(d.pace.elapsed_fraction, 0)} of the window gone` : ''}</div></>}
+      <div className="grid overflow-hidden rounded-xl border bg-card text-card-foreground @xl/main:grid-cols-2 @4xl/main:grid-cols-3">
+        <div className={cn('flex min-w-0 flex-col gap-1.5 px-5 py-4', READOUT_CELLS[0])}>
+          <div className="text-xs font-medium text-muted-foreground">Net spend</div>
+          <div className="text-2xl font-semibold tracking-tight">{inr(t.spend)}</div>
+          {tg && <div className="mt-auto flex flex-col gap-2 pt-1">
+            <Meter value={d.attainment.budget_used} goal={d.preEvent ? d.pace.elapsed_fraction : null} label="Spend versus approved budget" />
+            <div className="text-xs text-muted-foreground">{pct(d.attainment.budget_used, 0)} of {inr(tg.budget_inr)} approved{d.preEvent ? `, ${pct(d.pace.elapsed_fraction, 0)} of the window gone` : ''}</div>
+          </div>}
         </div>
-        <div className="readout">
-          <div className="readout-l">{d.preEvent ? 'Cost per confirmed registration' : 'Cost per verified visitor'}</div>
-          <div className="readout-v">{inr(d.preEvent ? d.blendedOutcomeCost : d.blendedCostPerVisitor)}</div>
-          <div className="readout-s">{d.preEvent ? 'Campaign spend ÷ campaign-attributed confirmations' : `All spend ÷ ${num(t.visitors)} visitors, including ${num(t.visitors_unattributed)} walk-ins`}</div>
+        <div className={cn('flex min-w-0 flex-col gap-1.5 px-5 py-4', READOUT_CELLS[1])}>
+          <div className="text-xs font-medium text-muted-foreground">{d.preEvent ? 'Cost per confirmed registration' : 'Cost per verified visitor'}</div>
+          <div className="text-2xl font-semibold tracking-tight">{inr(d.preEvent ? d.blendedOutcomeCost : d.blendedCostPerVisitor)}</div>
+          <div className="mt-auto pt-1 text-xs text-muted-foreground">{d.preEvent ? 'Campaign spend ÷ campaign-attributed confirmations' : `All spend ÷ ${num(t.visitors)} visitors, including ${num(t.visitors_unattributed)} walk-ins`}</div>
         </div>
-        <div className="readout">
-          <div className="readout-l">Registration status mix</div>
-          <div className="stackbar" role="img" aria-label={`Confirmed ${t.confirmed}, interested ${t.interested}, cancelled ${t.cancelled}, waitlisted ${t.waitlisted}`}>
-            {[['confirmed', C.ink], ['interested', C.grey], ['cancelled', C.brick], ['waitlisted', C.gold]].map(([k, col]) => (
-              <span key={k} style={{ width: `${(t[k] / statusTotal) * 100}%`, background: col }} />
+        <div className={cn('flex min-w-0 flex-col gap-1.5 px-5 py-4', READOUT_CELLS[2])}>
+          <div className="text-xs font-medium text-muted-foreground">Registration status mix</div>
+          <div className="mt-2 flex h-2 gap-px overflow-hidden rounded-full bg-muted" role="img" aria-label={`Confirmed ${t.confirmed}, interested ${t.interested}, cancelled ${t.cancelled}, waitlisted ${t.waitlisted}`}>
+            {statusParts.map(([k, , col]) => (
+              <span key={k} className="h-full" style={{ width: `${(t[k] / statusTotal) * 100}%`, background: col }} />
             ))}
           </div>
-          <div className="legend">
-            <span><i style={{ background: C.ink }} />Confirmed {num(t.confirmed)}</span><span><i style={{ background: C.grey }} />Interested {num(t.interested)}</span>
-            <span><i style={{ background: C.brick }} />Cancelled {num(t.cancelled)}</span><span><i style={{ background: C.gold }} />Waitlisted {num(t.waitlisted)}</span>
+          <div className="mt-auto flex flex-wrap gap-x-5 gap-y-1 pt-2 text-xs">
+            {statusParts.map(([k, label, col]) => (
+              <span key={k} className="flex items-center gap-1.5 text-muted-foreground">
+                <Swatch color={col} />{label}<span className="font-medium text-foreground">{num(t[k])}</span>
+              </span>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="split">
-        <Panel title="Registrations over time" aside={tg && <span className="muted small">Dashed line: {num(tg.registration_goal)} goal ({tg.target_version})</span>}>
+      <div className="grid items-start gap-4 @5xl/main:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <Panel title="Registrations over time" className="min-w-0"
+          aside={tg && <span className="flex items-center gap-1.5"><span className="w-3 border-t border-dashed border-foreground/60" aria-hidden="true" />{num(tg.registration_goal)} goal ({tg.target_version})</span>}>
           {series.length === 0 ? <Empty>No activity yet.</Empty> : (
-            <ResponsiveContainer width="100%" height={268}>
-              <ComposedChart data={series} margin={{ top: 10, right: 6, left: -14, bottom: 0 }}>
-                <CartesianGrid stroke={C.line} vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: C.muted }} tickLine={false} axisLine={{ stroke: C.line }} interval={Math.max(0, Math.floor(series.length / 7))} />
-                <YAxis yAxisId="l" tick={{ fontSize: 11, fill: C.muted }} tickLine={false} axisLine={false} />
-                <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 11, fill: C.muted }} tickLine={false} axisLine={false} />
-                <Tooltip content={<ChartTip />} cursor={{ fill: 'rgba(23,32,51,0.04)' }} />
-                <Bar yAxisId="l" dataKey="registrations" name="New registrations" fill={C.grey} radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
-                <Line yAxisId="r" dataKey="cum" name="Cumulative registrations" stroke={C.ink} dot={false} strokeWidth={2} isAnimationActive={!reducedMotion} />
-                <Line yAxisId="r" dataKey="visitors" name="Cumulative visitors" stroke={C.gold} dot={false} strokeWidth={2} connectNulls isAnimationActive={!reducedMotion} />
-                {tg && <ReferenceLine yAxisId="r" y={tg.registration_goal} stroke={C.ink} strokeDasharray="4 4" strokeOpacity={0.5} />}
-              </ComposedChart>
-            </ResponsiveContainer>
+            <>
+              <ChartContainer config={CHART_CONFIG} className="aspect-auto h-[260px] w-full">
+                <ComposedChart data={series} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="date" tick={TICK} tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" minTickGap={24} />
+                  <YAxis yAxisId="l" tickFormatter={num} tick={TICK} tickLine={false} axisLine={false} width={36} />
+                  <YAxis yAxisId="r" orientation="right" tickFormatter={num} tick={TICK} tickLine={false} axisLine={false} width={44} />
+                  <ChartTooltip cursor={{ fill: 'var(--muted)' }} content={<ChartTooltipContent className="min-w-[12rem]" />} />
+                  <Bar yAxisId="l" dataKey="registrations" name="registrations" fill="var(--color-registrations)" radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
+                  <Line yAxisId="r" dataKey="cum" name="cum" stroke="var(--color-cum)" dot={false} strokeWidth={2} isAnimationActive={!reducedMotion} />
+                  <Line yAxisId="r" dataKey="visitors" name="visitors" stroke="var(--color-visitors)" dot={false} strokeWidth={2} connectNulls isAnimationActive={!reducedMotion} />
+                  {tg && <ReferenceLine yAxisId="r" y={tg.registration_goal} stroke="var(--foreground)" strokeDasharray="4 4" strokeOpacity={0.5} />}
+                </ComposedChart>
+              </ChartContainer>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {Object.entries(CHART_CONFIG).map(([k, v]) => (
+                  <span key={k} className="flex items-center gap-1.5">
+                    <Swatch color={v.color} className={k === 'registrations' ? '' : 'h-0.5 w-3 rounded-full'} />{v.label}
+                  </span>
+                ))}
+              </div>
+            </>
           )}
         </Panel>
 
-        <Panel title="Needs attention" aside={<span className="muted small">{d.alerts.length} item{d.alerts.length === 1 ? '' : 's'}</span>} pad={false}>
-          {d.alerts.length === 0 ? <div className="pad"><Empty>Nothing breaks a rule on this date.</Empty></div> : (
-            <ul className="attention">
+        <Panel title="Needs attention" className="min-w-0" aside={<span>{d.alerts.length} item{d.alerts.length === 1 ? '' : 's'}</span>} pad={false}>
+          {d.alerts.length === 0 ? <div className="px-5 pb-5"><Empty>Nothing breaks a rule on this date.</Empty></div> : (
+            <ul className="divide-y border-t">
               {d.alerts.slice(0, 6).map((a, i) => (
-                <li key={i} className={`att sev-${a.severity}`}>
-                  <div className="att-t">{a.title}</div>
-                  <div className="att-d">{a.detail}</div>
-                  <div className="att-a">
-                    <button className="link" onClick={() => ask(`Diagnose this alert with the data and recommend what to do: "${a.title}". ${a.detail}`)}>Ask the analyst</button>
-                    <button className="link" onClick={() => setTaskDraft({
-                      title: `${a.title.replace(/:.*$/, '')}: follow up`, description: a.detail, campaign_id: a.campaign_id || '',
-                      owner_id: d.campaigns.find((c) => c.campaign_id === a.campaign_id)?.owner_id || '', priority: a.severity === 'high' ? 'high' : 'medium',
-                    })}>Create task</button>
+                <li key={i} className="flex gap-3 px-5 py-3">
+                  <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', SEVERITY_DOT[a.severity] || SEVERITY_DOT.low)} role="img" aria-label={SEVERITY_LABEL[a.severity] || `${a.severity} severity`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium">{a.title}</div>
+                    <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{a.detail}</div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Button variant="outline" size="xs" onClick={() => ask(`Diagnose this alert with the data and recommend what to do: "${a.title}". ${a.detail}`)}>
+                        <Icon name="chat" size={12} />Ask the analyst
+                      </Button>
+                      <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={() => setTaskDraft({
+                        title: `${a.title.replace(/:.*$/, '')}: follow up`, description: a.detail, campaign_id: a.campaign_id || '',
+                        owner_id: d.campaigns.find((c) => c.campaign_id === a.campaign_id)?.owner_id || '', priority: a.severity === 'high' ? 'high' : 'medium',
+                      })}>
+                        <Icon name="plus" size={12} />Create task
+                      </Button>
+                    </div>
                   </div>
                 </li>
               ))}
@@ -144,23 +200,23 @@ export default function Overview({ d, tasks, owners, asOf, ask, refresh, goto, v
       </div>
 
       <Panel title={d.preEvent ? 'Cost per confirmed registration, by campaign' : 'Cost per verified attendee, by campaign'}
-        aside={<button className="link" onClick={() => goto('campaigns')}>Open campaigns <Icon name="arrowRight" size={14} /></button>}>
+        aside={<Button variant="ghost" size="sm" className="-my-1 -mr-2 h-7 text-xs" onClick={() => goto('campaigns')}>Open campaigns <Icon name="arrowRight" size={14} /></Button>}>
         {efficiency.length === 0 ? <Empty>Not enough outcomes yet to compare campaigns.</Empty> : (
-          <div className="effbars">
+          <div className="flex flex-col gap-2.5">
             {efficiency.map((c) => (
-              <div key={c.campaign_id} className="effrow">
-                <div className="eff-name">{c.campaign_name}</div>
-                <div className="eff-track">
-                  <span className="eff-bar" style={{ width: `${(c.cost / maxCost) * 100}%`, background: TONE_COLOR[c.decision] || C.continue }} />
-                  {d.blendedOutcomeCost != null && <span className="eff-blend" style={{ left: `${(d.blendedOutcomeCost / maxCost) * 100}%` }} title={`Blended ${inr(d.blendedOutcomeCost)}`} />}
+              <div key={c.campaign_id} className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_3.5rem] items-center gap-3 text-sm @xl/main:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_4rem_5.5rem]">
+                <div className="truncate font-medium" title={c.campaign_name}>{c.campaign_name}</div>
+                <div className="relative h-3 rounded-sm bg-muted">
+                  <span className="absolute inset-y-0 left-0 rounded-sm" style={{ width: `${(c.cost / maxCost) * 100}%`, background: TONE_COLOR[c.decision] || C.continue }} />
+                  {d.blendedOutcomeCost != null && <span className="absolute -inset-y-1 w-0.5 -translate-x-1/2 rounded-full bg-foreground" style={{ left: `${(d.blendedOutcomeCost / maxCost) * 100}%` }} title={`Blended ${inr(d.blendedOutcomeCost)}`} />}
                 </div>
-                <div className="eff-val">{inrShort(c.cost)}</div>
-                <Decision value={c.decision} title={c.reason} />
+                <div className="text-right font-medium">{inrShort(c.cost)}</div>
+                <div className="hidden @xl/main:block"><Decision value={c.decision} title={c.reason} /></div>
               </div>
             ))}
-            <div className="eff-foot muted small">
+            <p className="mt-2 border-t pt-3 text-xs leading-relaxed text-muted-foreground">
               Vertical rule: blended {inr(d.blendedOutcomeCost)}. Colour and label follow the decision rules (thresholds in Data Lab). {d.campaigns.length - efficiency.length > 0 && `${d.campaigns.length - efficiency.length} campaign(s) have no outcomes yet.`}
-            </div>
+            </p>
           </div>
         )}
       </Panel>
